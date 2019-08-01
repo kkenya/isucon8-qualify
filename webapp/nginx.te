@@ -1,0 +1,20 @@
+
+module nginx 1.0;
+
+require {
+	type user_tmp_t;
+	type httpd_t;
+	type firewalld_t;
+	type http_cache_port_t;
+	class tcp_socket name_connect;
+	class file { setattr unlink };
+}
+
+#============= firewalld_t ==============
+allow firewalld_t user_tmp_t:file { setattr unlink };
+
+#============= httpd_t ==============
+
+#!!!! This avc can be allowed using one of the these booleans:
+#     httpd_can_network_connect, httpd_can_network_relay
+allow httpd_t http_cache_port_t:tcp_socket name_connect;
