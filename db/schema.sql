@@ -39,7 +39,5 @@ CREATE TABLE IF NOT EXISTS administrators (
     pass_hash   VARCHAR(128) NOT NULL,
     UNIQUE KEY login_name_uniq (login_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-ALTER TABLE reservations ADD INDEX idx_user_id_id(user_id);
-ALTER TABLE reservations ADD INDEX idx_event_id_id(event_id);
-ALTER TABLE reservations ADD INDEX idx_sheet_id_id(sheet_id);
 ALTER TABLE reservations ADD INDEX idx_user_id_canceled_at_id(user_id, canceled_at);
+ALTER TABLE sheets ADD INDEX idx__rank__num(rank, num);
