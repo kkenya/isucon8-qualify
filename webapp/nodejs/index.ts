@@ -95,12 +95,17 @@ async function getConnection() {
 }
 
 async function getLoginUser<T>(request: FastifyRequest<T>): Promise<LoginUser | null> {
-  const userId = JSON.parse(request.cookies.user_id || "null");
-  if (!userId) {
+  const id = JSON.parse(request.cookies.user_id || "null");
+  const nickname = request.cookies.user_nickname || "null";
+  if (!id || !nickname) {
     return Promise.resolve(null);
   } else {
+    console.log({ id: id, nickname: nickname});
+    if( id && nickname) {
+      return { id, nickname };
+    }
     const [[row]] = await fastify.mysql.query("SELECT id, nickname FROM users WHERE id = ?", [userId]);
-    return { ...row };
+    return { ...row }
   }
 }
 
@@ -348,7 +353,7 @@ fastify.post("/api/actions/login", async (request, reply) => {
   const loginName = request.body.login_name;
   const password = request.body.password;
 
-  const [[userRow]] = await fastify.mysql.query("SELECT * FROM users WHERE login_name = ?", [loginName]);
+  const [[userRow]] = await fastify.mysql.query("SELECT id, nickname, pass_hash FROM users WHERE login_name = ?", [loginName]);
   const [[passHashRow]] = await fastify.mysql.query("SELECT SHA2(?, 256)", [password]);
   const [passHash] = Object.values(passHashRow);
   if (!userRow || passHash !== userRow.pass_hash) {
@@ -358,13 +363,21 @@ fastify.post("/api/actions/login", async (request, reply) => {
   reply.setCookie("user_id", userRow.id, {
     path: "/",
   });
+  reply.setCookie("user_nickname", userRow.nickname, {
+    path: "/",
+  });
   request.cookies.user_id = `${userRow.id}`; // for the follong getLoginUser()
+  request.cookies.user_nickname = `${userRow.nickname}`; // for the follong getLoginUser()
   const user = await getLoginUser(request);
   reply.send(user);
 });
 
 fastify.post("/api/actions/logout", { beforeHandler: loginRequired }, async (_request, reply) => {
   reply.setCookie("user_id", "", {
+    path: "/",
+    expires: new Date(0),
+  });
+  reply.setCookie("user_nickname", "", {
     path: "/",
     expires: new Date(0),
   });
