@@ -100,11 +100,10 @@ async function getLoginUser<T>(request: FastifyRequest<T>): Promise<LoginUser | 
   if (!id || !nickname) {
     return Promise.resolve(null);
   } else {
-    console.log({ id: id, nickname: nickname});
     if( id && nickname) {
       return { id, nickname };
     }
-    const [[row]] = await fastify.mysql.query("SELECT id, nickname FROM users WHERE id = ?", [userId]);
+    const [[row]] = await fastify.mysql.query("SELECT id, nickname FROM users WHERE id = ?", [id]);
     return { ...row }
   }
 }
