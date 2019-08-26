@@ -313,7 +313,7 @@ fastify.get("/api/users/:id", { beforeHandler: loginRequired }, async (request, 
     const [rows] = await fastify.mysql.query("SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5", [[user.id]]);
 
     for (const row of rows) {
-      const event = await getEvent2(row.event_id);
+      const event = await getEvent(row.event_id);
 
       const reservation = {
         id: row.id,
@@ -354,64 +354,6 @@ fastify.get("/api/users/:id", { beforeHandler: loginRequired }, async (request, 
   reply.send(user);
 });
 
-async function getEvent2(eventId: number, loginUserId?: number): Promise<Event | null> {
-  const [[eventRow]] = await fastify.mysql.query("SELECT * FROM events WHERE id = ?", [eventId]);
-  if (!eventRow) {
-    return null;
-  }
-
-  const event = {
-    ...eventRow,
-    sheets: {},
-  };
-
-  // zero fill
-  event.total = 0;
-  event.remains = 0;
-  for (const rank of ["S", "A", "B", "C"]) {
-    const sheetsForRank = event.sheets[rank] ? event.sheets[rank] : (event.sheets[rank] = { detail: [] });
-    sheetsForRank.total = 0;
-    sheetsForRank.remains = 0;
-  }
-
-  const [sheetRows] = await fastify.mysql.query("SELECT * FROM sheets ORDER BY `rank`, num");
-
-  for (const sheetRow of sheetRows) {
-    const sheet = { ...sheetRow };
-    if (!event.sheets[sheet.rank].price) {
-      event.sheets[sheet.rank].price = event.price + sheet.price;
-    }
-
-    event.total++;
-    event.sheets[sheet.rank].total++;
-
-    const [[reservation]] = await fastify.mysql.query("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL", [event.id, sheet.id]);
-    if (reservation) {
-      if (loginUserId && reservation.user_id === loginUserId) {
-        sheet.mine = true;
-      }
-
-      sheet.reserved = true;
-      sheet.reserved_at = parseTimestampToEpoch(reservation.reserved_at);
-    } else {
-      event.remains++;
-      event.sheets[sheet.rank].remains++;
-    }
-
-    event.sheets[sheet.rank].detail.push(sheet);
-
-    delete sheet.id;
-    delete sheet.price;
-    delete sheet.rank;
-  }
-
-  event.public = !!event.public_fg;
-  delete event.public_fg;
-  event.closed = !!event.closed_fg;
-  delete event.closed_fg;
-
-  return event;
-}
 
 fastify.post("/api/actions/login", async (request, reply) => {
   const loginName = request.body.login_name;
