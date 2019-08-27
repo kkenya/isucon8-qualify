@@ -178,6 +178,18 @@ async function getEvent(eventId: number, loginUserId?: number): Promise<Event | 
 
   const [sheetRows] = await fastify.mysql.query("SELECT * FROM sheets ORDER BY `rank`, num");
 
+  const [reservationRows] = await fastify.mysql.query("SELECT * FROM reservations WHERE event_id = ? AND canceled_at IS NULL", [event.id]);
+
+  const reservations = new Array;
+
+  for (const reservationRow of reservationRows) {
+    if (reservations[reservationRow.sheet_id] && reservations[reservationRow.sheet_id] < reservationRow.reserved_at) {
+      continue;
+    } else {
+      reservations[reservationRow.sheet_id] = reservationRow;
+    }
+  }
+
   for (const sheetRow of sheetRows) {
     const sheet = { ...sheetRow };
     if (!event.sheets[sheet.rank].price) {
@@ -187,14 +199,12 @@ async function getEvent(eventId: number, loginUserId?: number): Promise<Event | 
     event.total++;
     event.sheets[sheet.rank].total++;
 
-    const [[reservation]] = await fastify.mysql.query("SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)", [event.id, sheet.id]);
-    if (reservation) {
-      if (loginUserId && reservation.user_id === loginUserId) {
-        sheet.mine = true;
-      }
-
+    if(reservations[sheet.id]) {
+      // todo mineの判定を入れる
+      if (loginUserId && reservations[sheet.id].user_id === loginUserId) 
+      sheet.mine = true;
       sheet.reserved = true;
-      sheet.reserved_at = parseTimestampToEpoch(reservation.reserved_at);
+      sheet.reserved_at = parseTimestampToEpoch(reservations[sheet.id].reserved_at);
     } else {
       event.remains++;
       event.sheets[sheet.rank].remains++;
@@ -343,6 +353,7 @@ fastify.get("/api/users/:id", { beforeHandler: loginRequired }, async (request, 
   user.recent_events = recentEvents;
   reply.send(user);
 });
+
 
 fastify.post("/api/actions/login", async (request, reply) => {
   const loginName = request.body.login_name;
